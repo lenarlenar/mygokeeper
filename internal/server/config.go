@@ -6,9 +6,10 @@ import (
 
 // Config содержит конфигурацию сервера.
 type Config struct {
-	ServerAddr string
-	JWTSecret  []byte
-	DBConn     string
+	ServerAddr     string
+	JWTSecret      []byte
+	DBConn         string
+	MigrationsPath string
 }
 
 // Load загружает конфигурацию из переменных окружения с дефолтами.
@@ -28,9 +29,15 @@ func Load() *Config {
 		db = "postgres://postgres:postgres@localhost:5432/gokeeper?sslmode=disable"
 	}
 
+	migrations := os.Getenv("GOKEEPER_MIGRATIONS")
+	if migrations == "" {
+		migrations = "../../internal/server/migrations"
+	}
+
 	return &Config{
-		ServerAddr: addr,
-		JWTSecret:  []byte(jwt),
-		DBConn:     db,
+		ServerAddr:     addr,
+		JWTSecret:      []byte(jwt),
+		DBConn:         db,
+		MigrationsPath: migrations,
 	}
 }

@@ -1,9 +1,14 @@
 package main
 
 import (
+	"context"
 	"database/sql"
 	"log"
 	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"github.com/lenarlenar/mygokeeper/internal/server"
 	"github.com/lenarlenar/mygokeeper/internal/server/handler"
@@ -17,7 +22,7 @@ func main() {
 
 	cfg := server.Load()
 
-	migrate.ApplyMigrations("../../internal/server/migrations", cfg.DBConn)
+	migrate.ApplyMigrations(cfg.MigrationsPath, cfg.DBConn)
 	db, err := sql.Open("postgres", cfg.DBConn)
 	if err != nil {
 		log.Fatal("failed to connect to database:", err)
@@ -50,9 +55,31 @@ func main() {
 		}
 	})))
 
-	log.Println("Server started at", cfg.ServerAddr)
-	err = http.ListenAndServe(cfg.ServerAddr, mux)
-	if err != nil {
-		log.Fatal(err)
+	srv := &http.Server{
+		Addr:    cfg.ServerAddr,
+		Handler: mux,
 	}
+
+	go func() {
+		log.Println("Server started at", cfg.ServerAddr)
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("ListenAndServe error: %v", err)
+		}
+	}()
+
+	// Graceful shutdown
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+	<-quit
+
+	log.Println("Shutting down server...")
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if err := srv.Shutdown(ctx); err != nil {
+		log.Fatalf("Server forced to shutdown: %v", err)
+	}
+
+	log.Println("Server exited gracefully")
 }

@@ -45,8 +45,12 @@ func SaveLocal(records []LocalRecord) error {
 
 func promptPassword(prompt string) string {
 	fmt.Print(prompt)
-	pass, _ := term.ReadPassword(int(os.Stdin.Fd()))
+	pass, err := term.ReadPassword(int(os.Stdin.Fd()))
 	fmt.Println()
+	if err != nil {
+		fmt.Println("Error reading password:", err)
+		os.Exit(1)
+	}
 	return string(pass)
 }
 
